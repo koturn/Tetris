@@ -1,0 +1,6 @@
+TermUtil/
+*.exe
+*.o
+*.obj
+*.out
+*.pdb
