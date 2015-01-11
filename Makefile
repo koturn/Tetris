@@ -37,7 +37,7 @@ GIT     := git
 INCS    := $(TERMUTIL_INCS)
 CFLAGS  := -pipe $(C_WARNING_FLAGS) $(COPTFLAGS) $(INCS) $(MACROS) $(if $(STD), $(addprefix -std=, $(STD)),)
 LDFLAGS := -pipe $(LDOPTFLAGS)
-LDLIBS  := $(TERMUTIL_LDLIBS)
+LDLIBS  := -lrt $(TERMUTIL_LDLIBS)
 TARGET  := tetris
 OBJ     := $(addsuffix .o, $(basename $(TARGET)))
 SRC     := $(OBJ:%.o=%.c)
