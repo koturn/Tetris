@@ -5,6 +5,8 @@ Tetris
 
 Terminal tetris.
 
+![tetris.png](https://raw.githubusercontent.com/wiki/koturn/Tetris/image/tetris.gif)
+
 This tetris works on terminal.
 
 You can build with both MSVC and gcc!
