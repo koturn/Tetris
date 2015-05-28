@@ -126,7 +126,10 @@ static void
 drop_block(void);
 
 static void
-show_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x);
+print_wall(void);
+
+static void
+print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x);
 
 static void
 print_score(int x, int y, int score);
@@ -212,7 +215,8 @@ initialize(void)
     }
   }
   create_block();
-  show_field(field, FIELD_X);
+  print_wall();
+  print_field(field, FIELD_X);
 }
 
 
@@ -298,7 +302,7 @@ drop_block(void)
   } else {
     lock_block();
     create_block();
-    show_field(field, FIELD_X);
+    print_field(field, FIELD_X);
   }
 }
 
@@ -363,57 +367,64 @@ create_block(void)
 
 
 /*!
+ * @brief Draw wall
+ */
+static void
+print_wall(void)
+{
+  int i, j;
+  tu_move(FIELD_Y - 1, 0);
+  tu_addstr("xxxxx            xxxxx");
+  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
+    tu_move(i + FIELD_Y, 0);
+    tu_addstr("x                    x");
+  }
+  tu_move(FIELD_Y + STAGE_HEIGHT - 1, 0);
+  tu_addstr("xxxxxxxxxxxxxxxxxxxxxx");
+}
+
+
+/*!
  * @brief Draw field
  *
  * @param [in] field  Field data
  * @param [in] x      X-coordinate of the field
  */
 static void
-show_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
+print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
 {
   int i, j;
 
-  for (i = 0; i < STAGE_HEIGHT; i++) {
-    tu_move(i + FIELD_Y, x);
-    for (j = 0; j < STAGE_WIDTH; j++) {
+  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
+    tu_move(i + FIELD_Y, x + 1);
+    for (j = 1; j < STAGE_WIDTH - 1; j++) {
       switch (field[i][j]) {
         case SPACE:
           tu_set_background(TU_DEFAULT_COLOR);
-          tu_addstr("  ");
           break;
         case 1:
           tu_set_background(TU_GRAY);
-          tu_addstr("  ");
           break;
         case 2:
           tu_set_background(TU_RED);
-          tu_addstr("  ");
           break;
         case 3:
           tu_set_background(TU_GREEN);
-          tu_addstr("  ");
           break;
         case 4:
           tu_set_background(TU_BLUE);
-          tu_addstr("  ");
           break;
         case 5:
           tu_set_background(TU_YELLOW);
-          tu_addstr("  ");
           break;
         case 6:
           tu_set_background(TU_MAGENTA);
-          tu_addstr("  ");
           break;
         case 7:
           tu_set_background(TU_CYAN);
-          tu_addstr("  ");
-          break;
-        case WALL:
-          tu_set_background(TU_DEFAULT_COLOR);
-          tu_addstr("xx");
           break;
       }
+      tu_addstr("  ");
     }
   }
   tu_set_foreground(TU_DEFAULT_COLOR);
@@ -473,7 +484,7 @@ move_block(int new_x, int new_y)
       field[y + i][x + j] += block[i][j];
     }
   }
-  show_field(field, FIELD_X);
+  print_field(field, FIELD_X);
 }
 
 
@@ -522,7 +533,7 @@ turn_block(Direction direction)
       field[y + i][x + j] += block[i][j];
     }
   }
-  show_field(field, FIELD_X);
+  print_field(field, FIELD_X);
   return TRUE;
 }
 
