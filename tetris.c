@@ -3,6 +3,7 @@
  * @brief Console tetris
  * @author koturn
  */
+#include <memory.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -348,11 +349,7 @@ create_block(void)
   y = 0;
   x = 4;
 
-  for (i = 0; i < BLOCK_HEIGHT; i++) {
-    for (j = 0; j < BLOCK_WIDTH; j++) {
-      block[i][j] = block_list[block_type][i][j];
-    }
-  }
+  memcpy((void *) block, (void *) block_list[block_type], sizeof(block));
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
       /* Gameover if locked block is already exist on in initial position */
@@ -372,7 +369,8 @@ create_block(void)
 static void
 print_wall(void)
 {
-  int i, j;
+  int i;
+
   tu_move(FIELD_Y - 1, 0);
   tu_addstr("xxxxx            xxxxx");
   for (i = 0; i < STAGE_HEIGHT - 1; i++) {
