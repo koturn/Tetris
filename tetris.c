@@ -349,7 +349,7 @@ create_block(void)
   y = 0;
   x = 4;
 
-  memcpy((void *) block, (void *) block_list[block_type], sizeof(block));
+  memcpy((void *) block, (const void *) block_list[block_type], sizeof(block));
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
       /* Gameover if locked block is already exist on in initial position */
@@ -497,11 +497,7 @@ turn_block(Direction direction)
   static unsigned char temp[BLOCK_HEIGHT][BLOCK_WIDTH];
   int i, j;
 
-  for (i = 0; i < BLOCK_HEIGHT; i++) {
-    for (j = 0; j < BLOCK_WIDTH; j++) {
-      temp[i][j] = block[i][j];
-    }
-  }
+  memcpy((void *) temp, (const void *) block, sizeof(temp));
   if (direction == RIGHT) {  /* Right-handed rotation */
     for (i = 0; i < BLOCK_HEIGHT; i++) {
       for (j = 0; j < BLOCK_WIDTH; j++) {
@@ -517,11 +513,7 @@ turn_block(Direction direction)
   }
   /* If block is overlapped, return to the original. */
   if (check_overlap(x, y)) {
-    for (i = 0; i < BLOCK_HEIGHT; i++) {
-      for (j = 0; j < BLOCK_WIDTH; j++) {
-        block[i][j] = temp[i][j];
-      }
-    }
+    memcpy((void *) block, (const void *) temp, sizeof(block));
     return FALSE;
   }
   /* Delete old block and add new block */
@@ -544,21 +536,11 @@ turn_block(Direction direction)
 static void
 lock_block(void)
 {
-  int i, j;
-
   /* Lock block */
-  for (i = 0; i < STAGE_HEIGHT; i++) {
-    for (j = 0; j < STAGE_WIDTH; j++) {
-      stage[i][j] = field[i][j];
-    }
-  }
+  memcpy((void *) stage, (const void *) field, sizeof(stage));
   check_lines();
   /* Update */
-  for (i = 0; i < STAGE_HEIGHT; i++) {
-    for (j = 0; j < STAGE_WIDTH; j++) {
-      field[i][j] = stage[i][j];
-    }
-  }
+  memcpy((void *) field, (const void *) stage, sizeof(field));
 }
 
 
