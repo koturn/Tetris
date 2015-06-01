@@ -22,6 +22,10 @@
 #  define msec_sleep(x)  usleep(x * 1000)
 #endif
 
+#define LENGTHOF(array)  (sizeof(array) / sizeof((array)[0]))
+
+
+#define N_NEXT_BLOCK  3
 
 #define STAGE_WIDTH   12  /*!< Width of stage */
 #define STAGE_HEIGHT  21  /*!< Height of stage */
@@ -35,8 +39,11 @@
 
 #define FIELD_X   0  /*!< X-coordinate of player's field */
 #define FIELD_Y   2  /*!< Y-coordinate of player's field */
-#define SCORE_X  32  /*!< X-coordinate of player's score */
+#define SCORE_X  36  /*!< X-coordinate of player's score */
 #define SCORE_Y  10  /*!< Y-coordinate of player's score */
+
+#define NEXT_BLOCK_X  23
+static const int NEXT_BLOCK_YS[] = {3, 10, 17};
 
 #define SCORE_LEN  10  /*!< Buffer size of score label */
 #define SCORE1  100
@@ -47,7 +54,7 @@
 #define CURSOR_X  (FIELD_X + STAGE_WIDTH)   /*!< X-coordinate of temporary cursor position */
 #define CURSOR_Y  (FIELD_Y + STAGE_HEIGHT)  /*!< Y-coordinate of temporary cursor position */
 
-#define TIME_X    32  /*!< X-coordinate of time label */
+#define TIME_X    36  /*!< X-coordinate of time label */
 #define TIME_Y     5  /*!< Y-coordinate of time label */
 #define TIME_LEN   5  /*!< Buffer size of time label */
 
@@ -74,6 +81,8 @@ typedef enum {
 } Direction;
 
 
+unsigned int next_idx = 0;
+static unsigned char next_blocks[N_NEXT_BLOCK];
 static unsigned char stage[STAGE_HEIGHT][STAGE_WIDTH];
 static unsigned char block[BLOCK_HEIGHT][BLOCK_WIDTH];
 static unsigned char field[STAGE_HEIGHT][STAGE_WIDTH];
@@ -140,6 +149,12 @@ print_time(time_t time);
 
 static void
 create_block(void);
+
+static void
+change_background_color(int color_nr);
+
+static void
+print_next_blocks(void);
 
 static int
 check_overlap(int x, int y);
@@ -215,8 +230,12 @@ initialize(void)
       }
     }
   }
+  for (i = 0; i < (int) LENGTHOF(next_blocks); i++) {
+    next_blocks[i] = (unsigned char) (rand() % N_BLOCK);
+  }
   create_block();
   print_wall();
+  print_next_blocks();
   print_field(field, FIELD_X);
 }
 
@@ -303,6 +322,7 @@ drop_block(void)
   } else {
     lock_block();
     create_block();
+    print_next_blocks();
     print_field(field, FIELD_X);
   }
 }
@@ -345,11 +365,12 @@ static void
 create_block(void)
 {
   int i, j;
-  int block_type = rand() % N_BLOCK;
   y = 0;
   x = 4;
 
-  memcpy((void *) block, (const void *) block_list[block_type], sizeof(block));
+  memcpy((void *) block, (const void *) block_list[next_blocks[next_idx]], sizeof(block));
+  next_blocks[next_idx] = (unsigned char) (rand() % N_BLOCK);
+  next_idx = (next_idx + 1) % LENGTHOF(next_blocks);
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
       /* Gameover if locked block is already exist on in initial position */
@@ -364,6 +385,31 @@ create_block(void)
 
 
 /*!
+ * @brief Print next blocks
+ */
+static void
+print_next_blocks(void)
+{
+  int i, j, k, idx;
+
+  for (i = 0; i < (int) LENGTHOF(next_blocks); i++) {
+    idx = next_blocks[(next_idx + i) % LENGTHOF(next_blocks)];
+    for (j = 0; j < BLOCK_HEIGHT; j++) {
+      for (k = 0; k < BLOCK_WIDTH; k++) {
+        if (block_list[idx][j][k]) {
+          change_background_color(block_list[idx][j][k]);
+        } else {
+          tu_set_background(TU_DEFAULT_COLOR);
+        }
+        tu_mvaddstr(NEXT_BLOCK_YS[i] + j, NEXT_BLOCK_X + k * 2, "  ");
+      }
+    }
+  }
+  tu_set_background(TU_DEFAULT_COLOR);
+}
+
+
+/*!
  * @brief Draw wall
  */
 static void
@@ -371,14 +417,14 @@ print_wall(void)
 {
   int i;
 
-  tu_move(FIELD_Y - 1, 0);
-  tu_addstr("xxxxx            xxxxx");
+  tu_mvaddstr(FIELD_Y - 1, 0, "xxxxx            xxxxxxxxxxxxxxxx");
   for (i = 0; i < STAGE_HEIGHT - 1; i++) {
-    tu_move(i + FIELD_Y, 0);
-    tu_addstr("x                    x");
+    tu_mvaddstr(i + FIELD_Y, 0, "x                    x          x");
   }
-  tu_move(FIELD_Y + STAGE_HEIGHT - 1, 0);
-  tu_addstr("xxxxxxxxxxxxxxxxxxxxxx");
+  for (i = 1; i < (int) LENGTHOF(next_blocks); i++) {
+    tu_mvaddstr(NEXT_BLOCK_YS[i] - 2, NEXT_BLOCK_X - 1, "xxxxxxxxxx");
+  }
+  tu_mvaddstr(FIELD_Y + STAGE_HEIGHT - 1, 0, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
 }
 
 
@@ -396,32 +442,7 @@ print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
   for (i = 0; i < STAGE_HEIGHT - 1; i++) {
     tu_move(i + FIELD_Y, x + 1);
     for (j = 1; j < STAGE_WIDTH - 1; j++) {
-      switch (field[i][j]) {
-        case SPACE:
-          tu_set_background(TU_DEFAULT_COLOR);
-          break;
-        case 1:
-          tu_set_background(TU_GRAY);
-          break;
-        case 2:
-          tu_set_background(TU_RED);
-          break;
-        case 3:
-          tu_set_background(TU_GREEN);
-          break;
-        case 4:
-          tu_set_background(TU_BLUE);
-          break;
-        case 5:
-          tu_set_background(TU_YELLOW);
-          break;
-        case 6:
-          tu_set_background(TU_MAGENTA);
-          break;
-        case 7:
-          tu_set_background(TU_CYAN);
-          break;
-      }
+      change_background_color(field[i][j]);
       tu_addstr("  ");
     }
   }
@@ -430,6 +451,42 @@ print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
   print_score(SCORE_X, SCORE_Y, score);
 
   tu_refresh();
+}
+
+
+/*!
+ * @brief Change background color
+ * @param [in] color_nr  Color number
+ */
+static void
+change_background_color(int color_nr)
+{
+  switch (color_nr) {
+    case SPACE:
+      tu_set_background(TU_DEFAULT_COLOR);
+      break;
+    case 1:
+      tu_set_background(TU_GRAY);
+      break;
+    case 2:
+      tu_set_background(TU_RED);
+      break;
+    case 3:
+      tu_set_background(TU_GREEN);
+      break;
+    case 4:
+      tu_set_background(TU_BLUE);
+      break;
+    case 5:
+      tu_set_background(TU_YELLOW);
+      break;
+    case 6:
+      tu_set_background(TU_MAGENTA);
+      break;
+    case 7:
+      tu_set_background(TU_CYAN);
+      break;
+  }
 }
 
 
