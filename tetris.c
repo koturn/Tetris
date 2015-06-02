@@ -51,8 +51,8 @@ static const int NEXT_BLOCK_YS[] = {3, 10, 17};
 #define SCORE3  500
 #define SCORE4  1000
 
-#define CURSOR_X  (FIELD_X + STAGE_WIDTH)   /*!< X-coordinate of temporary cursor position */
-#define CURSOR_Y  (FIELD_Y + STAGE_HEIGHT)  /*!< Y-coordinate of temporary cursor position */
+#define CURSOR_X  0  /*!< X-coordinate of temporary cursor position */
+#define CURSOR_Y  0  /*!< Y-coordinate of temporary cursor position */
 
 #define TIME_X    36  /*!< X-coordinate of time label */
 #define TIME_Y     5  /*!< Y-coordinate of time label */
@@ -142,7 +142,7 @@ static void
 print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x);
 
 static void
-print_score(int x, int y, int score);
+print_score(int _score);
 
 static void
 print_time(time_t time);
@@ -248,7 +248,7 @@ print_labels(void)
 {
   tu_mvaddstr(TIME_Y - 1, TIME_X - 1, "time:");
   tu_mvaddstr(SCORE_Y - 1, SCORE_X - 1, "score:");
-  print_score(SCORE_X, SCORE_Y, 0);
+  print_score(0);
 
   tu_mvaddstr(SCORE_Y + 2, SCORE_X - 1, "h : move left");
   tu_mvaddstr(SCORE_Y + 3, SCORE_X - 1, "l : move right");
@@ -335,12 +335,9 @@ drop_block(void)
  * @param [in] score  Player's score
  */
 static void
-print_score(int x, int y, int score)
+print_score(int _score)
 {
-  static char score_str[SCORE_LEN];
-
-  sprintf(score_str, "%5u", score);
-  tu_mvaddstr(y, x, score_str);
+  tu_mvprintw(SCORE_Y, SCORE_X, "%5d", _score);
 }
 
 
@@ -351,10 +348,7 @@ print_score(int x, int y, int score)
 static void
 print_time(time_t time)
 {
-  static char time_str[TIME_LEN];
-
-  sprintf(time_str, "%3ld", time);
-  tu_mvaddstr(TIME_Y, TIME_X, time_str);
+  tu_mvprintw(TIME_Y, TIME_X, "%5lu", time);
 }
 
 
@@ -448,7 +442,6 @@ print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
   }
   tu_set_foreground(TU_DEFAULT_COLOR);
   tu_set_background(TU_DEFAULT_COLOR);
-  print_score(SCORE_X, SCORE_Y, score);
 
   tu_refresh();
 }
@@ -652,6 +645,7 @@ check_lines(void)
       score += SCORE4;
       break;
   }
+  print_score(score);
 }
 
 
