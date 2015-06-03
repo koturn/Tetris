@@ -66,6 +66,18 @@ static const int NEXT_BLOCK_YS[] = {3, 10, 17};
 #endif
 
 
+typedef struct {
+  int x;
+  int y;
+} Position;
+
+typedef struct {
+  int block;
+  int next_block;
+  int score;
+  int time;
+} UpdateFlag;
+
 /*! Key-codes */
 enum keycode {
   CTRL_B = 0x02,  /*!< Ctrl-B */
@@ -118,16 +130,14 @@ static const unsigned char block_list[N_BLOCK][BLOCK_HEIGHT][BLOCK_WIDTH] = {
     {0, 0, 7, 0},
     {0, 0, 7, 0}}};
 
-static int y = 0;            /*!< Y-coordinate of dropping block */
-static int x = 4;            /*!< X-coordinate of dropping block */
-static int score = 0;        /*!< Player's score */
-static int gameover = FALSE; /*!< Flag of gameover */
+static UpdateFlag update_flag = {FALSE, FALSE, FALSE, FALSE};
+static Position block_pos = {0, 4};    /*!< Block position */
+static int    score = 0;               /*!< Player's score */
+static time_t gametime = (time_t) -1;  /*!< Player's score */
+static int    is_gameover = FALSE;     /*!< Flag of gameover */
 
 static void
 initialize(void);
-
-static void
-print_labels(void);
 
 static void
 control_block(void);
@@ -136,25 +146,10 @@ static void
 drop_block(void);
 
 static void
-print_wall(void);
-
-static void
-print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x);
-
-static void
-print_score(int _score);
-
-static void
-print_time(time_t time);
-
-static void
 create_block(void);
 
 static void
 change_background_color(int color_nr);
-
-static void
-print_next_blocks(void);
 
 static int
 check_overlap(int x, int y);
@@ -170,6 +165,27 @@ lock_block(void);
 
 static void
 check_lines(void);
+
+static void
+update_screen(void);
+
+static void
+print_labels(void);
+
+static void
+print_wall(void);
+
+static void
+print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x);
+
+static void
+print_next_blocks(void);
+
+static void
+print_score(int _score);
+
+static void
+print_time(time_t time);
 
 static time_t
 get_utc(void);
@@ -188,12 +204,16 @@ main(void)
   time_t base_time = time(NULL);
 
   initialize();
-  while (!gameover) {
+  while (!is_gameover) {
+    update_screen();
     control_block();
     if ((cnt = (cnt + 1) % 32) == 0) {
       drop_block();
     }
-    print_time(time(NULL) - base_time);
+    if (gametime != time(NULL) - base_time) {
+      gametime = time(NULL) - base_time;
+      update_flag.time = TRUE;
+    }
     tu_move(CURSOR_Y, CURSOR_X);
     msec_sleep(20);
   }
@@ -241,24 +261,6 @@ initialize(void)
 
 
 /*!
- * @brief Draw labels
- */
-static void
-print_labels(void)
-{
-  tu_mvaddstr(TIME_Y - 1, TIME_X - 1, "time:");
-  tu_mvaddstr(SCORE_Y - 1, SCORE_X - 1, "score:");
-  print_score(0);
-
-  tu_mvaddstr(SCORE_Y + 2, SCORE_X - 1, "h : move left");
-  tu_mvaddstr(SCORE_Y + 3, SCORE_X - 1, "l : move right");
-  tu_mvaddstr(SCORE_Y + 4, SCORE_X - 1, "j : drop a block");
-  tu_mvaddstr(SCORE_Y + 5, SCORE_X - 1, "a : right-handed rotation");
-  tu_mvaddstr(SCORE_Y + 6, SCORE_X - 1, "s : left-handed  rotation");
-}
-
-
-/*!
  * @brief Control block with key input
  */
 static void
@@ -267,34 +269,34 @@ control_block(void)
   switch (tu_getch()) {
     /* ----- Like vi ----- */
     case 'l':
-      if (!check_overlap(x + 1, y)) {
-        move_block(x + 1, y);
+      if (!check_overlap(block_pos.x + 1, block_pos.y)) {
+        move_block(block_pos.x + 1, block_pos.y);
       }
       break;
     case 'h':
-      if (!check_overlap(x - 1, y)) {
-        move_block(x - 1, y);
+      if (!check_overlap(block_pos.x - 1, block_pos.y)) {
+        move_block(block_pos.x - 1, block_pos.y);
       }
       break;
     case 'j':
-      if (!check_overlap(x, y + 1)) {
-        move_block(x, y + 1);
+      if (!check_overlap(block_pos.x, block_pos.y + 1)) {
+        move_block(block_pos.x, block_pos.y + 1);
       }
       break;
     /* ----- Like Emacs ----- */
     case CTRL_F:
-      if (!check_overlap(x + 1, y)) {
-        move_block(x + 1, y);
+      if (!check_overlap(block_pos.x + 1, block_pos.y)) {
+        move_block(block_pos.x + 1, block_pos.y);
       }
       break;
     case CTRL_B:
-      if (!check_overlap(x - 1, y)) {
-        move_block(x - 1, y);
+      if (!check_overlap(block_pos.x - 1, block_pos.y)) {
+        move_block(block_pos.x - 1, block_pos.y);
       }
       break;
     case CTRL_N:
-      if (!check_overlap(x, y + 1)) {
-        move_block(x, y + 1);
+      if (!check_overlap(block_pos.x, block_pos.y + 1)) {
+        move_block(block_pos.x, block_pos.y + 1);
       }
       break;
     /* ----- Rotate block ----- */
@@ -317,38 +319,14 @@ control_block(void)
 static void
 drop_block(void)
 {
-  if (!check_overlap(x, y + 1)) {
-    move_block(x, y + 1);
+  if (!check_overlap(block_pos.x, block_pos.y + 1)) {
+    move_block(block_pos.x, block_pos.y + 1);
   } else {
     lock_block();
     create_block();
-    print_next_blocks();
-    print_field(field, FIELD_X);
+    update_flag.block = TRUE;
+    update_flag.next_block = TRUE;
   }
-}
-
-
-/*!
- * @brief Draw player's score
- * @param [in] x      X-coordinate of score
- * @param [in] y      Y-coordinate of score
- * @param [in] score  Player's score
- */
-static void
-print_score(int _score)
-{
-  tu_mvprintw(SCORE_Y, SCORE_X, "%5d", _score);
-}
-
-
-/*!
- * @brief Draw elapsed time
- * @param [in] time  elapsed time
- */
-static void
-print_time(time_t time)
-{
-  tu_mvprintw(TIME_Y, TIME_X, "%5lu", time);
 }
 
 
@@ -359,8 +337,8 @@ static void
 create_block(void)
 {
   int i, j;
-  y = 0;
-  x = 4;
+  block_pos.y = 0;
+  block_pos.x = 4;
 
   memcpy((void *) block, (const void *) block_list[next_blocks[next_idx]], sizeof(block));
   next_blocks[next_idx] = (unsigned char) (rand() % N_BLOCK);
@@ -369,81 +347,12 @@ create_block(void)
     for (j = 0; j < BLOCK_WIDTH; j++) {
       /* Gameover if locked block is already exist on in initial position */
       if (stage[i][j + 4] != 0) {
-        gameover = TRUE;
+        is_gameover = TRUE;
         return;
       }
       field[i][j + 4] = block[i][j];
     }
   }
-}
-
-
-/*!
- * @brief Print next blocks
- */
-static void
-print_next_blocks(void)
-{
-  int i, j, k, idx;
-
-  for (i = 0; i < (int) LENGTHOF(next_blocks); i++) {
-    idx = next_blocks[(next_idx + i) % LENGTHOF(next_blocks)];
-    for (j = 0; j < BLOCK_HEIGHT; j++) {
-      for (k = 0; k < BLOCK_WIDTH; k++) {
-        if (block_list[idx][j][k]) {
-          change_background_color(block_list[idx][j][k]);
-        } else {
-          tu_set_background(TU_DEFAULT_COLOR);
-        }
-        tu_mvaddstr(NEXT_BLOCK_YS[i] + j, NEXT_BLOCK_X + k * 2, "  ");
-      }
-    }
-  }
-  tu_set_background(TU_DEFAULT_COLOR);
-}
-
-
-/*!
- * @brief Draw wall
- */
-static void
-print_wall(void)
-{
-  int i;
-
-  tu_mvaddstr(FIELD_Y - 1, 0, "xxxxx            xxxxxxxxxxxxxxxx");
-  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
-    tu_mvaddstr(i + FIELD_Y, 0, "x                    x          x");
-  }
-  for (i = 1; i < (int) LENGTHOF(next_blocks); i++) {
-    tu_mvaddstr(NEXT_BLOCK_YS[i] - 2, NEXT_BLOCK_X - 1, "xxxxxxxxxx");
-  }
-  tu_mvaddstr(FIELD_Y + STAGE_HEIGHT - 1, 0, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
-}
-
-
-/*!
- * @brief Draw field
- *
- * @param [in] field  Field data
- * @param [in] x      X-coordinate of the field
- */
-static void
-print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
-{
-  int i, j;
-
-  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
-    tu_move(i + FIELD_Y, x + 1);
-    for (j = 1; j < STAGE_WIDTH - 1; j++) {
-      change_background_color(field[i][j]);
-      tu_addstr("  ");
-    }
-  }
-  tu_set_foreground(TU_DEFAULT_COLOR);
-  tu_set_background(TU_DEFAULT_COLOR);
-
-  tu_refresh();
 }
 
 
@@ -518,21 +427,21 @@ move_block(int new_x, int new_y)
   /* Delete block on old position */
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
-      field[y + i][x + j] -= block[i][j];
+      field[block_pos.y + i][block_pos.x + j] -= block[i][j];
     }
   }
 
   /* Update block position */
-  x = new_x;
-  y = new_y;
+  block_pos.x = new_x;
+  block_pos.y = new_y;
 
   /* Push block into new position */
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
-      field[y + i][x + j] += block[i][j];
+      field[block_pos.y + i][block_pos.x + j] += block[i][j];
     }
   }
-  print_field(field, FIELD_X);
+  update_flag.block = TRUE;
 }
 
 
@@ -562,18 +471,18 @@ turn_block(Direction direction)
     }
   }
   /* If block is overlapped, return to the original. */
-  if (check_overlap(x, y)) {
+  if (check_overlap(block_pos.x, block_pos.y)) {
     memcpy((void *) block, (const void *) temp, sizeof(block));
     return FALSE;
   }
   /* Delete old block and add new block */
   for (i = 0; i < BLOCK_HEIGHT; i++) {
     for (j = 0; j < BLOCK_WIDTH; j++) {
-      field[y + i][x + j] -= temp[i][j];
-      field[y + i][x + j] += block[i][j];
+      field[block_pos.y + i][block_pos.x + j] -= temp[i][j];
+      field[block_pos.y + i][block_pos.x + j] += block[i][j];
     }
   }
-  print_field(field, FIELD_X);
+  update_flag.block = TRUE;
   return TRUE;
 }
 
@@ -634,18 +543,155 @@ check_lines(void)
   switch (lines) {
     case 1:
       score += SCORE1;
+      update_flag.score = TRUE;
       break;
     case 2:
       score += SCORE2;
+      update_flag.score = TRUE;
       break;
     case 3:
       score += SCORE3;
+      update_flag.score = TRUE;
       break;
     case 4:
       score += SCORE4;
+      update_flag.score = TRUE;
       break;
   }
-  print_score(score);
+}
+
+
+/*!
+ * @brief Update screen
+ */
+static void
+update_screen(void)
+{
+  if (update_flag.block) {
+    print_field(field, FIELD_X);
+    update_flag.block = FALSE;
+  }
+  if (update_flag.next_block) {
+    print_next_blocks();
+    update_flag.next_block = FALSE;
+  }
+  if (update_flag.time) {
+    print_time(gametime);
+    update_flag.time = FALSE;
+  }
+  if (update_flag.score) {
+    print_score(score);
+    update_flag.score = FALSE;
+  }
+  tu_refresh();
+}
+
+/*!
+ * @brief Draw labels
+ */
+static void
+print_labels(void)
+{
+  tu_mvaddstr(TIME_Y - 1, TIME_X - 1, "time:");
+  tu_mvaddstr(SCORE_Y - 1, SCORE_X - 1, "score:");
+  print_score(0);
+
+  tu_mvaddstr(SCORE_Y + 2, SCORE_X - 1, "h : move left");
+  tu_mvaddstr(SCORE_Y + 3, SCORE_X - 1, "l : move right");
+  tu_mvaddstr(SCORE_Y + 4, SCORE_X - 1, "j : drop a block");
+  tu_mvaddstr(SCORE_Y + 5, SCORE_X - 1, "a : right-handed rotation");
+  tu_mvaddstr(SCORE_Y + 6, SCORE_X - 1, "s : left-handed  rotation");
+}
+
+
+/*!
+ * @brief Draw wall
+ */
+static void
+print_wall(void)
+{
+  int i;
+
+  tu_mvaddstr(FIELD_Y - 1, 0, "xxxxx            xxxxxxxxxxxxxxxx");
+  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
+    tu_mvaddstr(i + FIELD_Y, 0, "x                    x          x");
+  }
+  for (i = 1; i < (int) LENGTHOF(next_blocks); i++) {
+    tu_mvaddstr(NEXT_BLOCK_YS[i] - 2, NEXT_BLOCK_X - 1, "xxxxxxxxxx");
+  }
+  tu_mvaddstr(FIELD_Y + STAGE_HEIGHT - 1, 0, "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx");
+}
+
+
+/*!
+ * @brief Draw field
+ *
+ * @param [in] field  Field data
+ * @param [in] x      X-coordinate of the field
+ */
+static void
+print_field(unsigned char field[STAGE_HEIGHT][STAGE_WIDTH], int x)
+{
+  int i, j;
+
+  for (i = 0; i < STAGE_HEIGHT - 1; i++) {
+    tu_move(i + FIELD_Y, x + 1);
+    for (j = 1; j < STAGE_WIDTH - 1; j++) {
+      change_background_color(field[i][j]);
+      tu_addstr("  ");
+    }
+  }
+  tu_set_foreground(TU_DEFAULT_COLOR);
+  tu_set_background(TU_DEFAULT_COLOR);
+}
+
+
+/*!
+ * @brief Print next blocks
+ */
+static void
+print_next_blocks(void)
+{
+  int i, j, k, idx;
+
+  for (i = 0; i < (int) LENGTHOF(next_blocks); i++) {
+    idx = next_blocks[(next_idx + i) % LENGTHOF(next_blocks)];
+    for (j = 0; j < BLOCK_HEIGHT; j++) {
+      for (k = 0; k < BLOCK_WIDTH; k++) {
+        if (block_list[idx][j][k]) {
+          change_background_color(block_list[idx][j][k]);
+        } else {
+          tu_set_background(TU_DEFAULT_COLOR);
+        }
+        tu_mvaddstr(NEXT_BLOCK_YS[i] + j, NEXT_BLOCK_X + k * 2, "  ");
+      }
+    }
+  }
+  tu_set_background(TU_DEFAULT_COLOR);
+}
+
+
+/*!
+ * @brief Draw player's score
+ * @param [in] x      X-coordinate of score
+ * @param [in] y      Y-coordinate of score
+ * @param [in] score  Player's score
+ */
+static void
+print_score(int _score)
+{
+  tu_mvprintw(SCORE_Y, SCORE_X, "%5d", _score);
+}
+
+
+/*!
+ * @brief Draw elapsed time
+ * @param [in] time  elapsed time
+ */
+static void
+print_time(time_t time)
+{
+  tu_mvprintw(TIME_Y, TIME_X, "%5lu", time);
 }
 
 
