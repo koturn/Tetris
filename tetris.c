@@ -4,6 +4,7 @@
  * @author koturn
  */
 #include <memory.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
@@ -15,6 +16,20 @@
 #endif
 #include <termutil.h>
 
+
+#ifndef __UNUSED__
+#  if defined(__cplusplus)
+#    define __UNUSED__(x)
+#  elif defined(__GNUC__)
+#    define __UNUSED__(x)  __UNUSED___ ## x __attribute__((unused))
+#  elif defined(_MSC_VER)
+#    define __UNUSED__(x)  __pragma(warning(suppress: 4100)) x
+#  elif defined(__LCLINT__)
+#    define __UNUSED__(x)  /*@unused@*/ x
+#  else
+#    define __UNUSED__(x)  x
+#  endif
+#endif
 
 #ifdef _MSC_VER
 #  define msec_sleep(x)  Sleep(x)
@@ -190,6 +205,9 @@ print_time(time_t time);
 static time_t
 get_utc(void);
 
+static void
+sigint_handler(int sig);
+
 
 
 
@@ -240,6 +258,8 @@ initialize(void)
   tu_cbreak();
   tu_noecho();
   tu_nonblocking();
+  atexit(tu_cleanup);
+  signal(SIGINT, sigint_handler);
   print_labels();
   for (i = 0; i < STAGE_HEIGHT; i++) {
     for (j = 0; j < STAGE_WIDTH; j++) {
@@ -721,4 +741,16 @@ get_utc(void)
   msec = tv.tv_usec / 1000;
 #endif
   return sec * 1000 + msec;
+}
+
+
+/*!
+ * @brief Signal handler for SIGINT
+ * @param [in] sig  Signal number (unused variable)
+ */
+static void
+sigint_handler(int __UNUSED__(sig))
+{
+  tu_cleanup();
+  exit(EXIT_SUCCESS);
 }
