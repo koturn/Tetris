@@ -329,6 +329,9 @@ control_block(void)
     case ' ':
       turn_block(RIGHT);
       break;
+    case 'q':
+      exit(0);
+      break;
   }
 }
 
@@ -621,6 +624,8 @@ print_labels(void)
   tu_mvaddstr(SCORE_Y + 4, SCORE_X - 1, "j : drop a block");
   tu_mvaddstr(SCORE_Y + 5, SCORE_X - 1, "a : right-handed rotation");
   tu_mvaddstr(SCORE_Y + 6, SCORE_X - 1, "s : left-handed  rotation");
+
+  tu_mvaddstr(SCORE_Y + 8, SCORE_X - 1, "q : quit");
 }
 
 
